@@ -5,29 +5,14 @@ voltage and load current, disconnects the protected appliance (output on `D2`) o
 voltage surge/sag or over-current fault, and exposes its configuration over UART so a
 computer can read and change the trip settings at runtime.
 
-> Submission scope note: configuration is implemented **via computer (UART) only**.
-> On-device configuration (LCD + buttons) is not implemented in this phase.
-
-## Repository layout
-
-```
-├── src/                firmware source (PlatformIO project)
-├── include/            firmware headers
-├── schematics/         schematic / block diagram of the product
-├── test_evidence/      serial logs, screenshots, timing captures
-├── project_files/      Proteus simulation project
-├── design_document.pdf one-page design report (see note below)
-└── readme.md           this file
-```
-
 ## Hardware / signal chain
 
-| Signal | Device pin | Sensor |
-|---|---|---|
-| AC voltage sense | `A0` | scaled/biased mains sample (mid-rail centered, `VOLTAGE_CAL = 187`) |
-| Load current | `A1` | ACS712-05B Hall sensor (mid-rail at 2.5 V, `185 mV/A`) |
-| Appliance disconnect (relay driver) | `D2` | HIGH = connected, LOW = disconnected |
-| UART config/status | `D0`/`D1` | 9600 8N1 |
+| Signal                              | Device pin | Sensor                                                              |
+| ----------------------------------- | ---------- | ------------------------------------------------------------------- |
+| AC voltage sense                    | `A0`       | scaled/biased mains sample (mid-rail centered, `VOLTAGE_CAL = 187`) |
+| Load current                        | `A1`       | ACS712-05B Hall sensor (mid-rail at 2.5 V, `185 mV/A`)              |
+| Appliance disconnect (relay driver) | `D2`       | HIGH = connected, LOW = disconnected                                |
+| UART config/status                  | `D0`/`D1`  | 9600 8N1                                                            |
 
 ## Measurement math
 
@@ -80,14 +65,14 @@ whenever the settings change, so the hot loop only does integer compares.
 
 ## UART protocol (9600 8N1, lines terminated by `\n`)
 
-| Command | Meaning | Reply |
-|---|---|---|
-| `SVB <volts>` | set voltage base | `OK SVB <volts>` |
-| `SVT <percent>` | set voltage tolerance | `OK SVT <percent>` |
-| `SCB <amps>` | set current base | `OK SCB <amps>` |
-| `SCT <percent>` | set current tolerance | `OK SCT <percent>` |
-| `GVB` / `GVT` | get voltage base / tolerance | `GVB <v>` / `GVT <p>` |
-| `GCB` / `GCT` | get current base / tolerance | `GCB <a>` / `GCT <p>` |
+| Command         | Meaning                      | Reply                 |
+| --------------- | ---------------------------- | --------------------- |
+| `SVB <volts>`   | set voltage base             | `OK SVB <volts>`      |
+| `SVT <percent>` | set voltage tolerance        | `OK SVT <percent>`    |
+| `SCB <amps>`    | set current base             | `OK SCB <amps>`       |
+| `SCT <percent>` | set current tolerance        | `OK SCT <percent>`    |
+| `GVB` / `GVT`   | get voltage base / tolerance | `GVB <v>` / `GVT <p>` |
+| `GCB` / `GCT`   | get current base / tolerance | `GCB <a>` / `GCT <p>` |
 
 Validation: `0 < base ≤ 500 V / 100 A`, `0 < tolerance ≤ 50 %`. Invalid input replies
 `ERR BAD_VALUE`; unknown commands reply `ERR UNKNOWN_CMD`. Parsing is non-blocking —

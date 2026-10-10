@@ -38,20 +38,6 @@ static bool surgeCheck(unsigned int rawCounts, unsigned int thresholdCounts,
   return false;
 }
 
-static void printStatus(float voltage, float current)
-{
-  Serial.print("V=");
-  Serial.print(voltage, 1);
-  Serial.print(" I=");
-  Serial.print(current, 2);
-  Serial.print(" D2=");
-  Serial.print(tripped ? "LOW" : "HIGH");
-  Serial.print(" vOver=");
-  Serial.print(voltageOverCount);
-  Serial.print(" iOver=");
-  Serial.println(currentOverCount);
-}
-
 static char cmdBuffer[32];
 static unsigned int cmdLength = 0;
 
@@ -234,8 +220,6 @@ void loop()
     {
       faultNow = true;
     }
-
-    printStatus(voltage, current);
   }
 
   if (faultNow)
