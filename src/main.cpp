@@ -5,77 +5,112 @@
 
 static const int VOLTAGE_PIN = A0;
 static const int CURRENT_PIN = A1;
-static const int ADC_COUNTS = 1024;
-static const float START_WINDOW_LOW = 0.45;
-static const float START_WINDOW_HIGH = 0.55;
-static const unsigned int VOLTAGE_CROSSINGS = 20;
-static const unsigned long VOLTAGE_TIMEOUT_MS = 2000;
-static const unsigned int CURRENT_SAMPLES = 500;
+static const int SURGE_PIN = 2;
+static const unsigned int SURGE_CONFIRM_SAMPLES = 10;
+static const unsigned long MEASURE_WINDOW_MS = 200;
+static const unsigned long RECOVERY_DELAY_MS = 2000;
 
-static float readVoltageRms()
+static unsigned int currentPeakCounts = 0;
+static unsigned int voltageOverCount = 0;
+static unsigned int currentOverCount = 0;
+static unsigned long windowStart = 0;
+static bool tripped = false;
+static unsigned long lastSurgeMs = 0;
+static bool rmsGateArmed = false;
+
+static unsigned int readChannel(int pin)
 {
-  unsigned long start = millis();
-  int startSample;
-  while (true) {
-    startSample = analogRead(VOLTAGE_PIN);
-    if (startSample > ADC_COUNTS * START_WINDOW_LOW &&
-        startSample < ADC_COUNTS * START_WINDOW_HIGH) {
-      break;
-    }
-    if (millis() - start > VOLTAGE_TIMEOUT_MS) {
-      break;
-    }
-  }
-
-  voltageBegin();
-
-  start = millis();
-  unsigned int crossCount = 0;
-  bool lastCross = false;
-  bool firstSample = true;
-
-  while (crossCount < VOLTAGE_CROSSINGS &&
-         (millis() - start) < VOLTAGE_TIMEOUT_MS) {
-    int sample = analogRead(VOLTAGE_PIN);
-    voltageAddSample(sample);
-
-    bool checkCross = sample > startSample;
-    if (firstSample) {
-      lastCross = checkCross;
-      firstSample = false;
-    } else if (checkCross != lastCross) {
-      crossCount++;
-    }
-    lastCross = checkCross;
-  }
-
-  return voltageGetRms();
+  analogRead(pin);
+  return analogRead(pin);
 }
 
-static float readCurrentRms()
+static bool surgeCheck(unsigned int rawCounts, unsigned int thresholdCounts,
+                       unsigned int &overCount)
 {
-  unsigned int peakCounts = 0;
-  for (unsigned int i = 0; i < CURRENT_SAMPLES; i++) {
-    unsigned int sample = analogRead(CURRENT_PIN);
-    if (sample > peakCounts) {
-      peakCounts = sample;
-    }
+  if (rawCounts > thresholdCounts)
+  {
+    overCount++;
+    return overCount >= SURGE_CONFIRM_SAMPLES;
   }
-  return calculateCurrentRms(peakCounts);
+  overCount = 0;
+  return false;
+}
+
+static void printStatus(float voltage, float current)
+{
+  Serial.print("V=");
+  Serial.print(voltage, 1);
+  Serial.print(" I=");
+  Serial.print(current, 2);
+  Serial.print(" D2=");
+  Serial.print(tripped ? "LOW" : "HIGH");
+  Serial.print(" vOver=");
+  Serial.print(voltageOverCount);
+  Serial.print(" iOver=");
+  Serial.println(currentOverCount);
 }
 
 void setup()
 {
+  pinMode(SURGE_PIN, OUTPUT);
+  digitalWrite(SURGE_PIN, HIGH);
+
   Serial.begin(9600);
+  Serial.println("AC Energy Meter");
+
+  voltageSetLimits(VOLTAGE_BASE_DEFAULT, VOLTAGE_TOLERANCE_PCT_DEFAULT);
+  currentSetLimits(CURRENT_BASE_DEFAULT, CURRENT_TOLERANCE_PCT_DEFAULT);
+
+  voltageBegin();
+  windowStart = millis();
 }
 
 void loop()
 {
-  float voltage = readVoltageRms();
-  float current = readCurrentRms();
+  unsigned int vRaw = readChannel(VOLTAGE_PIN);
+  unsigned int iRaw = readChannel(CURRENT_PIN);
 
-  Serial.print("V=");
-  Serial.print(voltage, 2);
-  Serial.print(" I=");
-  Serial.println(current, 2);
+  voltageAddSample(vRaw);
+  if (iRaw > currentPeakCounts)
+  {
+    currentPeakCounts = iRaw;
+  }
+
+  bool voltagePeakSurge = surgeCheck(vRaw, voltagePeakThresholdCounts(), voltageOverCount);
+  bool currentPeakSurge = surgeCheck(iRaw, currentPeakThresholdCounts(), currentOverCount);
+  bool faultNow = voltagePeakSurge || currentPeakSurge;
+
+  if (millis() - windowStart >= MEASURE_WINDOW_MS)
+  {
+    float voltage = voltageGetRms();
+    float current = calculateCurrentRms(currentPeakCounts);
+
+    voltageBegin();
+    currentPeakCounts = 0;
+    windowStart = millis();
+
+    if (!rmsGateArmed)
+    {
+      rmsGateArmed = true;
+    }
+    else if (voltage < voltageRmsLowerLimit() ||
+             voltage > voltageRmsUpperLimit() ||
+             current > currentRmsUpperLimit())
+    {
+      faultNow = true;
+    }
+
+    printStatus(voltage, current);
+  }
+
+  if (faultNow)
+  {
+    tripped = true;
+    lastSurgeMs = millis();
+  }
+  else if (tripped && millis() - lastSurgeMs >= RECOVERY_DELAY_MS)
+  {
+    tripped = false;
+  }
+  digitalWrite(SURGE_PIN, tripped ? LOW : HIGH);
 }
