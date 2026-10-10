@@ -32,6 +32,16 @@ void voltageSetLimits(double newBaseRms, double newTolerancePct)
   deriveLimits();
 }
 
+double voltageBase()
+{
+  return baseRms;
+}
+
+double voltageTolerancePct()
+{
+  return tolerancePct;
+}
+
 double voltageRmsLowerLimit()
 {
   return rmsLowerLimit;

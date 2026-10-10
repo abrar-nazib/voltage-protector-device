@@ -27,6 +27,16 @@ void currentSetLimits(double newBaseRms, double newTolerancePct)
   deriveLimits();
 }
 
+double currentBase()
+{
+  return baseRms;
+}
+
+double currentTolerancePct()
+{
+  return tolerancePct;
+}
+
 double currentRmsUpperLimit()
 {
   return rmsUpperLimit;

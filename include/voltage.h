@@ -11,6 +11,8 @@ void voltageAddSample(int rawSample);
 float voltageGetRms();
 
 void voltageSetLimits(double baseRms, double tolerancePct);
+double voltageBase();
+double voltageTolerancePct();
 double voltageRmsLowerLimit();
 double voltageRmsUpperLimit();
 unsigned int voltagePeakThresholdCounts();

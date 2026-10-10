@@ -10,5 +10,7 @@
 float calculateCurrentRms(unsigned int rawAdcValue);
 
 void currentSetLimits(double baseRms, double tolerancePct);
+double currentBase();
+double currentTolerancePct();
 double currentRmsUpperLimit();
 unsigned int currentPeakThresholdCounts();
